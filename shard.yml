@@ -1,0 +1,13 @@
+name: ipc
+version: 0.1.0
+
+authors:
+  - Luka Vandervelden <lukc@upyum.com>
+
+description: |
+  High-level Crystal bindings to libipc.
+
+libraries:
+  libipc: >= 0.1
+
+license: MIT
