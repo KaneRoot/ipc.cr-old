@@ -8,6 +8,6 @@ description: |
   High-level Crystal bindings to libipc.
 
 libraries:
-  libipc: >= 0.1
+  libipc: ">= 0.1"
 
 license: MIT
