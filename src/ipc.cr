@@ -1,17 +1,19 @@
+# TODO: more typing stuff.
+# Functions return enum error not just int, for instance.
 
 @[Link("ipc")]
 lib LibIPC
-	struct Service
+	struct Connection
 		version :  LibC::UInt
 		index :    LibC::UInt
-		spath :    LibC::Char[4096] # [PATH_MAX]
 		fd :       LibC::Int
+		type :     UInt8
+		spath :    LibC::Char* # [4096] # [PATH_MAX]
 	end
 
-	struct Client
-		version :  LibC::UInt
-		index :    LibC::UInt
-		fd :       LibC::Int
+	struct Connections
+		cinfos :   Connection**
+		size :     LibC::Int
 	end
 
 	enum MessageType
@@ -20,21 +22,79 @@ lib LibIPC
 		Data
 	end
 
+	enum Errors
+		None = 0
+		NotEnoughMemory
+		ClosedRecipient
+		ServerInitNoEnvironmentParam
+		ServerInitNoServiceParam
+		ServerInitNoServerNameParam
+		ServerInitMalloc
+		ConnectionNoServer
+		ConnectionNoServiceName
+		ConnectionNoEnvironmentParam
+		ConnectionGenNoCinfo
+		AcceptNoServiceParam
+		AcceptNoClientParam
+		Accept
+		HandleNewConnectionNoCinfoParam
+		HandleNewConnectionNoCinfosParam
+		WaitEventSelect
+		WaitEventNoClientsParam
+		WaitEventNoEventParam
+		HandleNewConnectionMalloc
+		AddEmptyList
+		AddNoParamClients
+		AddNoParamClient
+		AddFdNoParamCinfos
+		DelEmptyList
+		DelEmptiedList
+		DelCannotFindClient
+		DelNoClientsParam
+		DelNoClientParam
+		UsockSend
+		UsockConnectSocket
+		UsockConnectWrongFileDescriptor
+		UsockConnectEmptyPath
+		UsockClose
+		UsockRemoveUnlink
+		UsockRemoveNoFile
+		UsockInitEmptyFileDescriptor
+		UsockInitWrongFileDescriptor
+		UsockInitEmptyPath
+		UsockInitBind
+		UsockInitListen
+		UsockAcceptPathFileDescriptor
+		UsockAccept
+		UsockRecvNoBuffer
+		UsockRecvNoLength
+		UsockRecv
+		MessageNewNoMessageParam
+		MessageReadNomessageparam
+		MessageWriteNoMessageParam
+		MessageWriteNotEnoughData
+		MessageFormatNoMessageParam
+		MessageFormatInconsistentParams
+		MessageFormatLength
+		MessageFormatWriteEmptyMessage
+		MessageFormatWriteEmptyMsize
+		MessageFormatWriteEmptyBuffer
+		MessageFormatReadEmptyMessage
+		MessageFormatReadEmptyBuffer
+		MessageFormatReadMessageSize
+		MessageEmptyEmptyMessageList
+	end
+
 	struct Message
 		type :     UInt8
 		length :   LibC::UInt
 		payload :  LibC::Char*
 	end
 
-	struct Clients
-		clients :  Client**
-		size :     LibC::Int
-	end
-
 	enum EventType
 		NotSet
 		Error
-		Stdin
+		ExtraSocket
 		Connection
 		Disconnection
 		Message
@@ -42,126 +102,41 @@ lib LibIPC
 
 	struct Event
 		type :     EventType
-		origin :   Client*
-		m :        Message*
+		origin :   Connection*
+		message :  Message*
 	end
 
-	# FIXME: IPC.initialize:
-	#  - throw exceptions on error.
-	#  - Make most arguments optional.
-	fun ipc_server_init(env : LibC::Char**, service : Service*, sname : LibC::Char*) : LibC::Int
-	# FIXME: IPC.(destroy?)
-	fun ipc_server_close(Service*) : LibC::Int
-	fun ipc_server_close_client(Client*) : LibC::Int
+	fun ipc_server_init(env : LibC::Char**, connection : Connection*, sname : LibC::Char*) : LibC::Int
+	fun ipc_server_close(Connection*) : LibC::Int
+	fun ipc_close(Connection*) : LibC::Int
 
-	fun ipc_server_accept(Service*, Client*) : LibC::Int
-	fun ipc_server_read(Client*, Message*) : LibC::Int
-	fun ipc_server_write(Client*, Message*) : LibC::Int
+	# connection to a service
+	fun ipc_connection(LibC::Char**, Connection*, LibC::Char*) : LibC::Int
 
-	fun ipc_server_select(Clients*, Service*, Clients*, LibC::Int*) : LibC::Int
+	fun ipc_accept(Connection*, Connection*) : LibC::Int
+	fun ipc_read(Connection*, Message*) : LibC::Int
+	fun ipc_write(Connection*, Message*) : LibC::Int
 
-	fun ipc_service_poll_event(Clients*, Service*, Event*) : LibC::Int
+	fun ipc_wait_event(Connections*, Connection*, Event*) : LibC::Int
 
-	fun ipc_application_connection(LibC::Char**, Service*, LibC::Char*) : LibC::Int
-	fun ipc_application_close(Service*) : LibC::Int
-	fun ipc_application_read(Service*, Message*) : LibC::Int
-	fun ipc_application_write(Service*, Message*) : LibC::Int
+	fun ipc_add(Connections*, Connection*) : LibC::Int
+	fun ipc_del(Connections*, Connection*) : LibC::Int
+	fun ipc_add_fd (Connections*, LibC::Int) : LibC::Int
 
-	fun ipc_client_add(Clients*, Client*) : LibC::Int
-	fun ipc_client_del(Clients*, Client*) : LibC::Int
+	fun ipc_connection_copy(Connection*) : Connection*
+	fun ipc_connection_eq(Connection*, Connection*) : LibC::Int
 
-	fun ipc_server_client_copy(Client*) : Client*
-	fun ipc_server_client_eq(Client*, Client*) : LibC::Int
+	fun ipc_connection_gen(Connection*, LibC::UInt, LibC::UInt)
 
-	fun ipc_server_client_gen(Client*, LibC::UInt, LibC::UInt)
-
-	fun ipc_clients_free(Clients*)
+	fun ipc_connections_free(Connections*)
+	fun ipc_get(Connections*)
+	fun ipc_errors_get (LibC::Int) : LibC::Char*
 end
 
 class IPC::Exception < ::Exception
-
-end
-
-class IPC::Service
-	@closed = false
-	@clients = LibIPC::Clients.new
-	# FIXME: getter only as long as proper bindings are unfinished
-	getter service = LibIPC::Service.new
-
-	def initialize(name : String)
-		if LibIPC.ipc_server_init(LibC.environ, pointerof(@service), name) < 0
-			raise Exception.new "ipc_server_init < 0" # FIXME: Add proper descriptions here.
-		end
-
-		# Very important as there are filesystem side-effects.
-		at_exit { close }
-	end
-
-	def initialize(name : String, &block : Proc(IPC::Event::Connection | IPC::Event::Disconnection | IPC::Event::Message, Nil))
-		initialize name
-		loop &block
-		close
-	end
-
-	def close
-		return if @closed
-
-		# FIXME: Probably check it’s not been closed already.
-		if LibIPC.ipc_server_close(pointerof(@service)) < 0
-			raise Exception.new "ipc_server_close < 0"
-		end
-
-		@closed = true
-	end
-	def finalize
-		close
-	end
-
-	def accept
-		::IPC::Server::Client.new pointerof(@service)
-	end
-
-	def loop(&block)
-		::loop do
-			event = LibIPC::Event.new
-
-			r = LibIPC.ipc_service_poll_event pointerof(@clients), pointerof(@service), pointerof(event)
-
-			if r < 0
-				raise Exception.new "ipc_service_poll_event < 0"
-			end
-
-			client = IPC::RemoteClient.new event.origin.unsafe_as(Pointer(LibIPC::Client)).value
-
-			pp! event
-			message = event.m.unsafe_as(Pointer(LibIPC::Message))
-			unless message.null?
-				pp! message.value
-			end
-
-			case event.type
-			when LibIPC::EventType::Connection
-				yield IPC::Event::Connection.new client
-			when LibIPC::EventType::Message
-				message = event.m.unsafe_as(Pointer(LibIPC::Message)).value
-
-				yield IPC::Event::Message.new IPC::Message.new(message.type, message.length, message.payload), client
-			when LibIPC::EventType::Disconnection
-				yield IPC::Event::Disconnection.new client
-			end
-		end
-	end
 end
 
 class IPC::Message
-	enum Type
-		CLOSE
-		CONNECTION
-		SYN
-		ACK
-		DATA
-	end
-
 	getter type : UInt8
 	getter payload : String
 
@@ -171,50 +146,48 @@ class IPC::Message
 	end
 end
 
-class IPC::RemoteClient
-	getter client : LibIPC::Client
-
-	def initialize(@client)
-	end
-
-	def send(type : UInt8, payload : String)
-		message = LibIPC::Message.new type: type, length: payload.bytesize, payload: payload.to_unsafe
-
-		if LibIPC.ipc_server_write(pointerof(@client), pointerof(message)) < 0
-			raise Exception.new "ipc_server_write < 0"
-		end
-	end
-end
-
 class IPC::Event
 	class Connection
-		getter client : IPC::RemoteClient
-		def initialize(@client)
+		getter connection : IPC::Connection
+		def initialize(@connection)
 		end
 	end
 
 	class Disconnection
-		getter client : IPC::RemoteClient
-		def initialize(@client)
+		getter connection : IPC::Connection
+		def initialize(@connection)
 		end
 	end
 
 	class Message
 		getter message : ::IPC::Message
-		getter client : IPC::RemoteClient
-		def initialize(@message, @client)
+		getter connection : IPC::Connection
+		def initialize(@message, @connection)
 		end
+	end
+
+	class ExtraSocket < IPC::Event::Message
 	end
 end
 
-class IPC::Client
-	@service = LibIPC::Service.new
+class IPC::Connection
+	@closed = false
+	@connection : LibIPC::Connection
 
-	def initialize(@service_name : String)
-		if LibIPC.ipc_application_connection(LibC.environ, pointerof(@service), @service_name) < 0
-			raise Exception.new "ipc_application_connection < 0"
+	# connection already established
+	def initialize(c : LibIPC::Connection)
+		@connection = c
+	end
+
+	def initialize(service_name : String)
+		@connection = LibIPC::Connection.new
+		r = LibIPC.ipc_connection(LibC.environ, pointerof(@connection), service_name)
+		if r != 0
+			m = String.new LibIPC.ipc_errors_get (r)
+			raise Exception.new "error during connection establishment: #{m}"
 		end
 	end
+
 	def initialize(name, &block)
 		initialize(name)
 
@@ -223,26 +196,137 @@ class IPC::Client
 		close
 	end
 
-	def send(type, payload : String)
-		message = LibIPC::Message.new type: type, length: payload.bytesize, payload: payload.to_unsafe
+	def send(type : LibIPC::MessageType, payload : String)
+		message = LibIPC::Message.new type: type.to_u8, length: payload.bytesize, payload: payload.to_unsafe
 
-		if LibIPC.ipc_application_write(pointerof(@service), pointerof(message)) < 0
-			raise Exception.new "ipc_application_write < 0"
+		r = LibIPC.ipc_write(pointerof(@connection), pointerof(message))
+		if r != 0
+			m = String.new LibIPC.ipc_errors_get (r)
+			raise Exception.new "error writing a message: #{m}"
 		end
 	end
 
 	def read
 		message = LibIPC::Message.new
-		if LibIPC.ipc_application_read(pointerof(@service), pointerof(message)) < 0
-			raise Exception.new "ipc_application_read < 0"
+		r = LibIPC.ipc_read(pointerof(@connection), pointerof(message))
+		if r != 0
+			m = String.new LibIPC.ipc_errors_get (r)
+			raise Exception.new "error reading a message: #{m}"
 		end
 
 		IPC::Message.new message.type, message.length, message.payload
 	end
 
 	def close
-		if LibIPC.ipc_application_close(pointerof(@service)) < 0
-			raise Exception.new "ipc_application_close < 0"
+		return if @closed
+
+		r = LibIPC.ipc_close(pointerof(@connection))
+		if r != 0
+			m = String.new LibIPC.ipc_errors_get (r)
+			raise Exception.new "cannot close correctly the connection: #{m}"
+		end
+
+		@closed = true
+	end
+end
+
+class IPC::Service
+	@closed = false
+	@connections = LibIPC::Connections.new
+	@service_info = LibIPC::Connection.new
+
+	def initialize(name : String)
+		r = LibIPC.ipc_server_init(LibC.environ, pointerof(@service_info), name)
+		if r != 0
+			m = String.new LibIPC.ipc_errors_get (r)
+			raise Exception.new "cannot initialize the server named #{name}: #{m}"
+		end
+
+		# Very important as there are filesystem side-effects.
+		at_exit { close }
+	end
+
+	alias Events = IPC::Event::Connection | IPC::Event::Disconnection | IPC::Event::Message | IPC::Event::ExtraSocket
+
+	def initialize(name : String, &block : Proc(Events, Nil))
+		initialize name
+		loop &block
+		close
+	end
+
+	def add_file_descriptor (fd : Int)
+		r = LibIPC.ipc_add_fd(pointerof(@connections), fd)
+		if r != 0
+			m = String.new LibIPC.ipc_errors_get (r)
+			raise Exception.new "cannot add an arbitrary file descriptor: #{m}"
+		end
+	end
+
+	# TODO: not implemented in libipc, yet.
+	# def del_file_descriptor (fd : Int)
+	# 	r = LibIPC.ipc_del_fd(pointerof(@connections), fd)
+	# 	if r != 0
+	# 		m = String.new LibIPC.ipc_errors_get (r)
+	# 		raise Exception.new "cannot remove an arbitrary file descriptor: #{m}"
+	# 	end
+	# end
+
+	def close
+		return if @closed
+
+		r = LibIPC.ipc_server_close(pointerof(@service_info))
+		if r != 0
+			m = String.new LibIPC.ipc_errors_get (r)
+			raise Exception.new "cannot close the server correctly: #{m}"
+		end
+
+		@closed = true
+	end
+
+	def finalize
+		close
+	end
+
+	def loop(&block)
+		::loop do
+			event = LibIPC::Event.new
+
+			r = LibIPC.ipc_wait_event pointerof(@connections), pointerof(@service_info), pointerof(event)
+
+			if r != 0
+				m = String.new LibIPC.ipc_errors_get (r)
+				yield IPC::Exception.new "error waiting for a new event: #{m}"
+			end
+
+			connection = IPC::Connection.new event.origin.unsafe_as(Pointer(LibIPC::Connection)).value
+
+			pp! event
+			message = event.message.unsafe_as(Pointer(LibIPC::Message))
+			unless message.null?
+				pp! message.value
+			end
+
+			case event.type
+			when LibIPC::EventType::Connection
+				yield IPC::Event::Connection.new connection
+
+			when LibIPC::EventType::NotSet
+				yield IPC::Exception.new "even type not set"
+
+			when LibIPC::EventType::Error
+				yield IPC::Exception.new "even type indicates an error"
+
+			when LibIPC::EventType::ExtraSocket
+				message = event.message.unsafe_as(Pointer(LibIPC::Message)).value
+				yield IPC::Event::ExtraSocket.new IPC::Message.new(message.type, message.length, message.payload), connection
+
+			when LibIPC::EventType::Message
+				message = event.message.unsafe_as(Pointer(LibIPC::Message)).value
+				yield IPC::Event::Message.new IPC::Message.new(message.type, message.length, message.payload), connection
+
+			when LibIPC::EventType::Disconnection
+				yield IPC::Event::Disconnection.new connection
+			end
 		end
 	end
 end
