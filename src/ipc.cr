@@ -86,9 +86,10 @@ lib LibIPC
 	end
 
 	struct Message
-		type :     UInt8
-		length :   LibC::UInt
-		payload :  LibC::Char*
+		type :       UInt8
+		user_type :  UInt8
+		length :     LibC::UInt
+		payload :    LibC::Char*
 	end
 
 	enum EventType
@@ -113,7 +114,6 @@ lib LibIPC
 	# connection to a service
 	fun ipc_connection(LibC::Char**, Connection*, LibC::Char*) : LibC::Int
 
-	fun ipc_accept(Connection*, Connection*) : LibC::Int
 	fun ipc_read(Connection*, Message*) : LibC::Int
 	fun ipc_write(Connection*, Message*) : LibC::Int
 
@@ -138,10 +138,19 @@ end
 
 class IPC::Message
 	getter type : UInt8
+	getter user_type : UInt8
 	getter payload : String
 
-	def initialize(type, length, payload)
+	def initialize(m : Pointer(LibIPC::Message))
+		message = m.unsafe_as(Pointer(LibIPC::Message)).value
+		@type = message.type
+		@user_type = message.user_type
+		@payload = String.new message.payload, message.length
+	end
+
+	def initialize(type, user_type, length, payload)
 		@type = type.to_u8
+		@user_type = user_type
 		@payload = String.new payload, length
 	end
 end
@@ -196,8 +205,8 @@ class IPC::Connection
 		close
 	end
 
-	def send(type : LibIPC::MessageType, payload : String)
-		message = LibIPC::Message.new type: type.to_u8, length: payload.bytesize, payload: payload.to_unsafe
+	def send(user_type : UInt8, payload : String)
+		message = LibIPC::Message.new type: LibIPC::MessageType::Data.to_u8, user_type: user_type, length: payload.bytesize, payload: payload.to_unsafe
 
 		r = LibIPC.ipc_write(pointerof(@connection), pointerof(message))
 		if r != 0
@@ -214,7 +223,7 @@ class IPC::Connection
 			raise Exception.new "error reading a message: #{m}"
 		end
 
-		IPC::Message.new message.type, message.length, message.payload
+		IPC::Message.new message.type, message.user_type, message.length, message.payload
 	end
 
 	def close
@@ -318,11 +327,12 @@ class IPC::Service
 
 			when LibIPC::EventType::ExtraSocket
 				message = event.message.unsafe_as(Pointer(LibIPC::Message)).value
-				yield IPC::Event::ExtraSocket.new IPC::Message.new(message.type, message.length, message.payload), connection
+				yield IPC::Event::ExtraSocket.new IPC::Message.new(message.type, message.user_type, message.length, message.payload), connection
 
 			when LibIPC::EventType::Message
-				message = event.message.unsafe_as(Pointer(LibIPC::Message)).value
-				yield IPC::Event::Message.new IPC::Message.new(message.type, message.length, message.payload), connection
+				# message = event.message.unsafe_as(Pointer(LibIPC::Message)).value
+				# yield IPC::Event::Message.new IPC::Message.new(message.type, message.length, message.payload), connection
+				yield IPC::Event::Message.new IPC::Message.new(event.message), connection
 
 			when LibIPC::EventType::Disconnection
 				yield IPC::Event::Disconnection.new connection
