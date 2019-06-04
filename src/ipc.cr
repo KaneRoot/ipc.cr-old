@@ -16,12 +16,6 @@ lib LibIPC
 		size :     LibC::Int
 	end
 
-	enum MessageType
-		ServerClose
-		Error
-		Data
-	end
-
 	enum Errors
 		None = 0
 		NotEnoughMemory
@@ -85,6 +79,12 @@ lib LibIPC
 		MessageEmptyEmptyMessageList
 	end
 
+	enum MessageType
+		ServerClose
+		Error
+		Data
+	end
+
 	struct Message
 		type :       UInt8
 		user_type :  UInt8
@@ -137,21 +137,31 @@ class IPC::Exception < ::Exception
 end
 
 class IPC::Message
-	getter type : UInt8
-	getter user_type : UInt8
-	getter payload : String
+	getter mtype : UInt8   # libipc message type
+	getter type : UInt8    # libipc user message type
+	getter payload : Bytes
 
-	def initialize(m : Pointer(LibIPC::Message))
-		message = m.unsafe_as(Pointer(LibIPC::Message)).value
-		@type = message.type
-		@user_type = message.user_type
-		@payload = String.new message.payload, message.length
+	def initialize(message : Pointer(LibIPC::Message))
+		if message.null?
+			@mtype = LibIPC::MessageType::Error.to_u8
+			@type = 0
+			@payload = Bytes.new "".to_unsafe, 0
+		else
+			m = message.value
+			@mtype = m.type
+			@type = m.user_type
+			@payload = Bytes.new m.payload, m.length
+		end
 	end
 
-	def initialize(type, user_type, length, payload)
-		@type = type.to_u8
-		@user_type = user_type
-		@payload = String.new payload, length
+	def initialize(mtype, type, payload : Bytes)
+		@mtype = mtype.to_u8
+		@type = type
+		@payload = payload
+	end
+
+	def initialize(mtype, type, payload : String)
+		initialize(mtype, type, Bytes.new(payload.to_unsafe, payload.bytesize))
 	end
 end
 
@@ -205,14 +215,22 @@ class IPC::Connection
 		close
 	end
 
-	def send(user_type : UInt8, payload : String)
-		message = LibIPC::Message.new type: LibIPC::MessageType::Data.to_u8, user_type: user_type, length: payload.bytesize, payload: payload.to_unsafe
+	def send(type : UInt8, payload : Bytes)
+		message = LibIPC::Message.new type: LibIPC::MessageType::Data.to_u8, user_type: type, length: payload.bytesize, payload: payload.to_unsafe
 
 		r = LibIPC.ipc_write(pointerof(@connection), pointerof(message))
 		if r != 0
 			m = String.new LibIPC.ipc_errors_get (r)
 			raise Exception.new "error writing a message: #{m}"
 		end
+	end
+
+	def send(type : UInt8, payload : String)
+		send(type, Bytes.new(payload.to_unsafe, payload.bytesize))
+	end
+
+	def send(message : IPC::Message)
+		send(message.type, message.payload)
 	end
 
 	def read
@@ -223,7 +241,7 @@ class IPC::Connection
 			raise Exception.new "error reading a message: #{m}"
 		end
 
-		IPC::Message.new message.type, message.user_type, message.length, message.payload
+		IPC::Message.new message.mtype, message.type, message.payload
 	end
 
 	def close
@@ -238,6 +256,8 @@ class IPC::Connection
 		@closed = true
 	end
 end
+
+alias Events = IPC::Event::Connection | IPC::Event::Disconnection | IPC::Event::Message | IPC::Event::ExtraSocket
 
 class IPC::Service
 	@closed = false
@@ -255,9 +275,7 @@ class IPC::Service
 		at_exit { close }
 	end
 
-	alias Events = IPC::Event::Connection | IPC::Event::Disconnection | IPC::Event::Message | IPC::Event::ExtraSocket
-
-	def initialize(name : String, &block : Proc(Events, Nil))
+	def initialize(name : String, &block : Proc(Events|Exception, Nil))
 		initialize name
 		loop &block
 		close
@@ -296,26 +314,31 @@ class IPC::Service
 		close
 	end
 
-	def loop(&block)
+	def wait_event(&block) : Tuple(LibIPC::EventType, IPC::Message, IPC::Connection)
+		event = LibIPC::Event.new
+
+		r = LibIPC.ipc_wait_event pointerof(@connections), pointerof(@service_info), pointerof(event)
+		if r != 0
+			m = String.new LibIPC.ipc_errors_get (r)
+			yield IPC::Exception.new "error waiting for a new event: #{m}"
+		end
+
+		connection = IPC::Connection.new event.origin.unsafe_as(Pointer(LibIPC::Connection)).value
+
+		pp! event
+		message = event.message.unsafe_as(Pointer(LibIPC::Message))
+		unless message.null?
+			pp! message.value
+		end
+
+		return event.type, IPC::Message.new(message), connection
+	end
+
+	def loop(&block : Proc(Events|Exception, Nil))
 		::loop do
-			event = LibIPC::Event.new
+			type, message, connection = wait_event &block
 
-			r = LibIPC.ipc_wait_event pointerof(@connections), pointerof(@service_info), pointerof(event)
-
-			if r != 0
-				m = String.new LibIPC.ipc_errors_get (r)
-				yield IPC::Exception.new "error waiting for a new event: #{m}"
-			end
-
-			connection = IPC::Connection.new event.origin.unsafe_as(Pointer(LibIPC::Connection)).value
-
-			pp! event
-			message = event.message.unsafe_as(Pointer(LibIPC::Message))
-			unless message.null?
-				pp! message.value
-			end
-
-			case event.type
+			case type
 			when LibIPC::EventType::Connection
 				yield IPC::Event::Connection.new connection
 
@@ -326,13 +349,10 @@ class IPC::Service
 				yield IPC::Exception.new "even type indicates an error"
 
 			when LibIPC::EventType::ExtraSocket
-				message = event.message.unsafe_as(Pointer(LibIPC::Message)).value
-				yield IPC::Event::ExtraSocket.new IPC::Message.new(message.type, message.user_type, message.length, message.payload), connection
+				yield IPC::Event::ExtraSocket.new message, connection
 
 			when LibIPC::EventType::Message
-				# message = event.message.unsafe_as(Pointer(LibIPC::Message)).value
-				# yield IPC::Event::Message.new IPC::Message.new(message.type, message.length, message.payload), connection
-				yield IPC::Event::Message.new IPC::Message.new(event.message), connection
+				yield IPC::Event::Message.new message, connection
 
 			when LibIPC::EventType::Disconnection
 				yield IPC::Event::Disconnection.new connection
