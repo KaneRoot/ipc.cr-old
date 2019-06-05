@@ -190,8 +190,8 @@ class IPC::Event
 end
 
 class IPC::Connection
-	@closed = false
-	@connection : LibIPC::Connection
+	getter connection : LibIPC::Connection
+	getter closed = false
 
 	# connection already established
 	def initialize(c : LibIPC::Connection)
