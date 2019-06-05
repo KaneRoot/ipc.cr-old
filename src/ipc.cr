@@ -281,7 +281,16 @@ class IPC::Service
 		close
 	end
 
-	def add_file_descriptor (fd : Int)
+	def << (connection : IPC::Connection)
+		c = connection.connection
+		r = LibIPC.ipc_add(pointerof(@connections), pointerof(c))
+		if r != 0
+			m = String.new LibIPC.ipc_errors_get (r)
+			raise Exception.new "cannot add an arbitrary file descriptor: #{m}"
+		end
+	end
+
+	def << (fd : Int)
 		r = LibIPC.ipc_add_fd(pointerof(@connections), fd)
 		if r != 0
 			m = String.new LibIPC.ipc_errors_get (r)
@@ -289,14 +298,13 @@ class IPC::Service
 		end
 	end
 
-	# TODO: not implemented in libipc, yet.
-	# def del_file_descriptor (fd : Int)
-	# 	r = LibIPC.ipc_del_fd(pointerof(@connections), fd)
-	# 	if r != 0
-	# 		m = String.new LibIPC.ipc_errors_get (r)
-	# 		raise Exception.new "cannot remove an arbitrary file descriptor: #{m}"
-	# 	end
-	# end
+	def remove_fd (fd : Int)
+		r = LibIPC.ipc_del_fd(pointerof(@connections), fd)
+		if r != 0
+			m = String.new LibIPC.ipc_errors_get (r)
+			raise Exception.new "cannot remove an arbitrary file descriptor: #{m}"
+		end
+	end
 
 	def close
 		return if @closed
