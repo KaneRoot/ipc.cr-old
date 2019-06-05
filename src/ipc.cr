@@ -250,7 +250,7 @@ class IPC::Connection
 		r = LibIPC.ipc_close(pointerof(@connection))
 		if r != 0
 			m = String.new LibIPC.ipc_errors_get (r)
-			raise Exception.new "cannot close correctly the connection: #{m}"
+			raise Exception.new "cannot correctly close the connection: #{m}"
 		end
 
 		@closed = true
