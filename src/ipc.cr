@@ -241,7 +241,7 @@ class IPC::Connection
 			raise Exception.new "error reading a message: #{m}"
 		end
 
-		IPC::Message.new message.type, message.user_type, String.new(message.payload)
+		IPC::Message.new pointerof(message)
 	end
 
 	def close
