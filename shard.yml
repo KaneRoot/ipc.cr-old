@@ -1,13 +1,14 @@
 name: ipc
-version: 0.1.0
+version: 0.2.0
 
 authors:
+  - Philippe Pittoli <karchnu@karchnu.fr>
   - Luka Vandervelden <lukc@upyum.com>
 
 description: |
-  High-level Crystal bindings to libipc.
+    High-level Crystal bindings to libipc.
 
 libraries:
   libipc: ">= 0.1"
 
-license: MIT
+license: ISC
