@@ -70,21 +70,28 @@ class IPC::SwitchingService < IPC::Service
 		@switch.del fd
 	end
 
-	def wait_event(server : IPC::Connection , &block) : Tuple(LibIPC::EventType, IPC::Message, IPC::Connection)
+	def wait_event(server : IPC::Connection , &block) : Tuple(LibIPC::EventType, IPC::Message, IPC::Connection) | Tuple(LibIPC::EventType, Nil, Nil)
 		event = LibIPC::Event.new
 
 		serverp = server.pointer
-		r = LibIPC.ipc_wait_event_networkd self.pointer, serverp, pointerof(event), @switch.pointer
+		r = LibIPC.ipc_wait_event_networkd self.pointer, serverp, pointerof(event), @switch.pointer, pointerof(@timer)
+
 		if r != 0
 			m = String.new LibIPC.ipc_errors_get (r)
 			yield IPC::Exception.new "error waiting for a new event: #{m}"
 		end
 
+		eventtype = event.type.unsafe_as(LibIPC::EventType)
+
+		# if event type is Timer, there is no connection nor message
+		case eventtype
+		when LibIPC::EventType::Timer
+			return eventtype, nil, nil
+		end
+
 		connection = IPC::Connection.new event.origin.unsafe_as(Pointer(LibIPC::Connection)).value
 
 		message = event.message.unsafe_as(Pointer(LibIPC::Message))
-
-		eventtype = event.type.unsafe_as(LibIPC::EventType)
 
 		return eventtype, IPC::Message.new(message), connection
 	end

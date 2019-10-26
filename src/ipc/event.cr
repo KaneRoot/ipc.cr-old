@@ -3,6 +3,9 @@ require "./message"
 require "./connection"
 
 class IPC::Event
+	class Timer
+	end
+
 	class Connection
 		getter connection : IPC::Connection
 		def initialize(@connection)
@@ -32,5 +35,5 @@ class IPC::Event
 	end
 end
 
-alias Events = IPC::Event::Connection | IPC::Event::Disconnection | IPC::Event::Message | IPC::Event::ExtraSocket | IPC::Event::Switch | IPC::Event::LookUp
+alias Events = IPC::Event::Timer | IPC::Event::Connection | IPC::Event::Disconnection | IPC::Event::Message | IPC::Event::ExtraSocket | IPC::Event::Switch | IPC::Event::LookUp
 

@@ -93,6 +93,8 @@ class IPC::StandAloneConnection
 end
 
 class IPC::Connections
+	property base_timer : Int64 = 0
+	property timer : Int64 = 0
 	getter connections : LibIPC::Connections
 
 	def initialize
@@ -143,27 +145,42 @@ class IPC::Connections
 			serverp = server.pointer
 		end
 
-		r = LibIPC.ipc_wait_event self.pointer, serverp, pointerof(event)
+		r = LibIPC.ipc_wait_event self.pointer, serverp, pointerof(event), pointerof(@timer)
 		if r != 0
 			m = String.new LibIPC.ipc_errors_get (r)
 			yield IPC::Exception.new "error waiting for a new event: #{m}"
 		end
 
+		eventtype = event.type.unsafe_as(LibIPC::EventType)
+
+		# if event type is Timer, there is no connection nor message
+		case eventtype
+		when LibIPC::EventType::Timer
+			return eventtype, nil, nil
+		end
+
 		connection = IPC::Connection.new event.origin.unsafe_as(Pointer(LibIPC::Connection)).value
 
-		eventtype = event.type.unsafe_as(LibIPC::EventType)
 		message = event.message.unsafe_as(Pointer(LibIPC::Message))
 
 		return eventtype, IPC::Message.new(message), connection
 	end
 
 	def loop(server : IPC::Connection | IPC::Server | ::Nil, &block : Proc(Events|Exception, Nil))
+		if @base_timer > 0 && @timer == 0
+			@timer = @base_timer
+		end
+
 		::loop do
 			type, message, connection = wait_event server, &block
 
 			case type
+			when LibIPC::EventType::Timer
+				# reset timer
+				@timer = @base_timer
+				yield IPC::Event::Timer.new
 			when LibIPC::EventType::Connection
-				yield IPC::Event::Connection.new connection
+				yield IPC::Event::Connection.new connection.not_nil!
 
 			when LibIPC::EventType::NotSet
 				yield IPC::Exception.new "even type not set"
@@ -172,13 +189,13 @@ class IPC::Connections
 				yield IPC::Exception.new "even type indicates an error"
 
 			when LibIPC::EventType::ExtraSocket
-				yield IPC::Event::ExtraSocket.new message, connection
+				yield IPC::Event::ExtraSocket.new message.not_nil!, connection.not_nil!
 
 			when LibIPC::EventType::Switch
-				yield IPC::Event::Switch.new message, connection
+				yield IPC::Event::Switch.new message.not_nil!, connection.not_nil!
 
 			when LibIPC::EventType::Message
-				yield IPC::Event::Message.new message, connection
+				yield IPC::Event::Message.new message.not_nil!, connection.not_nil!
 
 			# for now, the libipc does not provide lookup events
 			# networkd uses a simple LibIPC::EventType::Message
@@ -186,7 +203,7 @@ class IPC::Connections
 				# yield IPC::Event::LookUp.new message, connection
 
 			when LibIPC::EventType::Disconnection
-				yield IPC::Event::Disconnection.new connection
+				yield IPC::Event::Disconnection.new connection.not_nil!
 			end
 		end
 	end

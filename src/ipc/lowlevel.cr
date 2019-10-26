@@ -111,6 +111,7 @@ lib LibIPC
 		Disconnection
 		Message
 		LookUp
+		Timer
 	end
 
 	struct Event
@@ -129,7 +130,7 @@ lib LibIPC
 	fun ipc_read(Connection*, Message*) : LibC::Int
 	fun ipc_write(Connection*, Message*) : LibC::Int
 
-	fun ipc_wait_event(Connections*, Connection*, Event*) : LibC::Int
+	fun ipc_wait_event(Connections*, Connection*, Event*, LibC::Long*) : LibC::Int
 
 	fun ipc_add(Connections*, Connection*) : LibC::Int
 	fun ipc_del(Connections*, Connection*) : LibC::Int
@@ -148,7 +149,7 @@ lib LibIPC
 
 
 	# networkd-related functions
-	fun ipc_wait_event_networkd(Connections*, Connection*, Event*, Switchings*) : LibC::Int
+	fun ipc_wait_event_networkd(Connections*, Connection*, Event*, Switchings*, LibC::Long*) : LibC::Int
 
 	fun ipc_receive_fd (sock : LibC::Int, fd : LibC::Int*) : LibC::Int
 	fun ipc_provide_fd (sock : LibC::Int, fd : LibC::Int) : LibC::Int
