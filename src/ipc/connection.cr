@@ -137,7 +137,7 @@ class IPC::Connections
 		end
 	end
 
-	def wait_event(server : IPC::Connection | Nil, &block) : Tuple(LibIPC::EventType, IPC::Message, IPC::Connection)
+	def wait_event(server : IPC::Connection | Nil, &block) : Tuple(LibIPC::EventType, IPC::Message, IPC::Connection) | Tuple(LibIPC::EventType, Nil, Nil)
 		event = LibIPC::Event.new
 
 		serverp = nil
