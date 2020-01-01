@@ -24,70 +24,6 @@ lib LibIPC
 		size : LibC::UInt
 	end
 
-	enum Errors
-		None = 0
-		NotEnoughMemory
-		ClosedRecipient
-		ServerInitNoEnvironmentParam
-		ServerInitNoServiceParam
-		ServerInitNoServerNameParam
-		ServerInitMalloc
-		ConnectionNoServer
-		ConnectionNoServiceName
-		ConnectionNoEnvironmentParam
-		ConnectionGenNoCinfo
-		AcceptNoServiceParam
-		AcceptNoClientParam
-		Accept
-		HandleNewConnectionNoCinfoParam
-		HandleNewConnectionNoCinfosParam
-		WaitEventSelect
-		WaitEventNoClientsParam
-		WaitEventNoEventParam
-		HandleNewConnectionMalloc
-		AddEmptyList
-		AddNoParamClients
-		AddNoParamClient
-		AddFdNoParamCinfos
-		DelEmptyList
-		DelEmptiedList
-		DelCannotFindClient
-		DelNoClientsParam
-		DelNoClientParam
-		UsockSend
-		UsockConnectSocket
-		UsockConnectWrongFileDescriptor
-		UsockConnectEmptyPath
-		UsockConnectConnect
-		UsockClose
-		UsockRemoveUnlink
-		UsockRemoveNoFile
-		UsockInitEmptyFileDescriptor
-		UsockInitWrongFileDescriptor
-		UsockInitEmptyPath
-		UsockInitBind
-		UsockInitListen
-		UsockAcceptPathFileDescriptor
-		UsockAccept
-		UsockRecvNoBuffer
-		UsockRecvNoLength
-		UsockRecv
-		MessageNewNoMessageParam
-		MessageReadNomessageparam
-		MessageWriteNoMessageParam
-		MessageWriteNotEnoughData
-		MessageFormatNoMessageParam
-		MessageFormatInconsistentParams
-		MessageFormatLength
-		MessageFormatWriteEmptyMessage
-		MessageFormatWriteEmptyMsize
-		MessageFormatWriteEmptyBuffer
-		MessageFormatReadEmptyMessage
-		MessageFormatReadEmptyBuffer
-		MessageFormatReadMessageSize
-		MessageEmptyEmptyMessageList
-	end
-
 	enum MessageType
 		ServerClose
 		Error
@@ -120,49 +56,52 @@ lib LibIPC
 		message :  Message*
 	end
 
-	fun ipc_server_init(env : LibC::Char**, connection : Connection*, sname : LibC::Char*) : LibC::Int
-	fun ipc_server_close(Connection*) : LibC::Int
-	fun ipc_close(Connection*) : LibC::Int
+	struct IPCError
+		# This is the size of an enumeration in C.
+		error_code : UInt32
+		error_message : LibC::Char[8192]
+	end
+
+	fun ipc_server_init(env : LibC::Char**, connection : Connection*, sname : LibC::Char*) : IPCError
+	fun ipc_server_close(Connection*) : IPCError
+	fun ipc_close(Connection*) : IPCError
 
 	# connection to a service
-	fun ipc_connection(LibC::Char**, Connection*, LibC::Char*) : LibC::Int
+	fun ipc_connection(LibC::Char**, Connection*, LibC::Char*) : IPCError
 
-	fun ipc_read(Connection*, Message*) : LibC::Int
-	fun ipc_write(Connection*, Message*) : LibC::Int
+	fun ipc_read(Connection*, Message*) : IPCError
+	fun ipc_write(Connection*, Message*) : IPCError
 
-	fun ipc_wait_event(Connections*, Connection*, Event*, LibC::Long*) : LibC::Int
+	fun ipc_wait_event(Connections*, Connection*, Event*, LibC::Long*) : IPCError
 
-	fun ipc_add(Connections*, Connection*) : LibC::Int
-	fun ipc_del(Connections*, Connection*) : LibC::Int
-	fun ipc_add_fd(Connections*, LibC::Int) : LibC::Int
-	fun ipc_del_fd(Connections*, LibC::Int) : LibC::Int
+	fun ipc_add(Connections*, Connection*) : IPCError
+	fun ipc_del(Connections*, Connection*) : IPCError
+	fun ipc_add_fd(Connections*, LibC::Int) : IPCError
+	fun ipc_del_fd(Connections*, LibC::Int) : IPCError
 
-	fun ipc_connection_copy(Connection*) : Connection*
-	fun ipc_connection_eq(Connection*, Connection*) : LibC::Int
+	fun ipc_connection_gen(Connection*, LibC::UInt, LibC::UInt) : IPCError
 
-	fun ipc_connection_gen(Connection*, LibC::UInt, LibC::UInt)
+	fun ipc_connections_free(Connections*)  # Void
+	fun ipc_connections_close(Connections*) # Void
 
-	fun ipc_connections_free(Connections*)
-	fun ipc_connections_close(Connections*)
-	fun ipc_get(Connections*)
+	# This function let the user get the default error message based on the error code.
+	# The error message is contained in the IPCError structure, this function should not be used, in most cases.
 	fun ipc_errors_get (LibC::Int) : LibC::Char*
 
 
 	# networkd-related functions
-	fun ipc_wait_event_networkd(Connections*, Connection*, Event*, Switchings*, LibC::Long*) : LibC::Int
+	fun ipc_wait_event_networkd(Connections*, Connection*, Event*, Switchings*, LibC::Long*) : IPCError
 
-	fun ipc_receive_fd (sock : LibC::Int, fd : LibC::Int*) : LibC::Int
-	fun ipc_provide_fd (sock : LibC::Int, fd : LibC::Int) : LibC::Int
+	fun ipc_receive_fd (sock : LibC::Int, fd : LibC::Int*) : IPCError
+	fun ipc_provide_fd (sock : LibC::Int, fd : LibC::Int ) : IPCError
 
-	fun ipc_switching_add   (switch : Switchings*, fd1 : LibC::Int, fd2 : LibC::Int)
-	fun ipc_switching_del   (switch : Switchings*, fd  : LibC::Int                 ) : LibC::Int
-	fun ipc_switching_get   (switch : Switchings*, fd  : LibC::Int                 ) : LibC::Int
-	fun ipc_switching_free  (switch : Switchings*                                  ) : LibC::Int
-	fun ipc_switching_print (switch : Switchings*)
+	fun ipc_switching_add  (switch : Switchings*, fd1 : LibC::Int, fd2 : LibC::Int) # Void
+	fun ipc_switching_del  (switch : Switchings*, fd  : LibC::Int                 ) : LibC::Int
+	fun ipc_switching_get  (switch : Switchings*, fd  : LibC::Int                 ) : LibC::Int
+	fun ipc_switching_free (switch : Switchings*                                  ) # Void
 
 	# non public functions (for testing purposes)
-	fun service_path (path : LibC::Char*, sname : LibC::Char*, index : Int32, version : Int32) : LibC::Int
-	fun log_get_logfile_dir (buf : LibC::Char*, size : LibC::UInt) : LibC::Char*
-	fun log_get_logfile_name (buf : LibC::Char*, size : LibC::UInt)
-	fun ipc_connections_print(Connections*)
+	fun ipc_switching_print (switch : Switchings*) # Void
+	fun service_path (path : LibC::Char*, sname : LibC::Char*, index : Int32, version : Int32) : IPCError
+	fun ipc_connections_print (Connections*) # Void
 end

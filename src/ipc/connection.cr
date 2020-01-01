@@ -13,9 +13,14 @@ class IPC::Connection
 
 	def initialize(service_name : String)
 		@connection = LibIPC::Connection.new
+
+		# TODO
+		pp! self.pointer
+		pp! @connection
+
 		r = LibIPC.ipc_connection(LibC.environ, self.pointer, service_name)
-		if r != 0
-			m = String.new LibIPC.ipc_errors_get (r)
+		if r.error_code != 0
+			m = String.new r.error_message.to_slice
 			raise Exception.new "error during connection establishment: #{m}"
 		end
 	end
@@ -37,8 +42,8 @@ class IPC::Connection
 		message = LibIPC::Message.new type: LibIPC::MessageType::Data.to_u8, user_type: type, length: payload.bytesize, payload: payload.to_unsafe
 
 		r = LibIPC.ipc_write(self.pointer, pointerof(message))
-		if r != 0
-			m = String.new LibIPC.ipc_errors_get (r)
+		if r.error_code != 0
+			m = String.new r.error_message.to_slice
 			raise Exception.new "error writing a message: #{m}"
 		end
 	end
@@ -54,8 +59,8 @@ class IPC::Connection
 	def read
 		message = LibIPC::Message.new
 		r = LibIPC.ipc_read(pointerof(@connection), pointerof(message))
-		if r != 0
-			m = String.new LibIPC.ipc_errors_get (r)
+		if r.error_code != 0
+			m = String.new r.error_message.to_slice
 			raise Exception.new "error reading a message: #{m}"
 		end
 
@@ -66,8 +71,8 @@ class IPC::Connection
 		return if @closed
 
 		r = LibIPC.ipc_close(self.pointer)
-		if r != 0
-			m = String.new LibIPC.ipc_errors_get (r)
+		if r.error_code != 0
+			m = String.new r.error_message.to_slice
 			raise Exception.new "cannot correctly close the connection: #{m}"
 		end
 
@@ -106,16 +111,16 @@ class IPC::Connections
 
 	def << (client : IPC::Connection)
 		r = LibIPC.ipc_add(self.pointer, client.pointer)
-		if r != 0
-			m = String.new LibIPC.ipc_errors_get (r)
+		if r.error_code != 0
+			m = String.new r.error_message.to_slice
 			raise Exception.new "cannot add an arbitrary file descriptor: #{m}"
 		end
 	end
 
 	def << (fd : Int)
 		r = LibIPC.ipc_add_fd(self.pointer, fd)
-		if r != 0
-			m = String.new LibIPC.ipc_errors_get (r)
+		if r.error_code != 0
+			m = String.new r.error_message.to_slice
 			raise Exception.new "cannot add an arbitrary file descriptor: #{m}"
 		end
 	end
@@ -123,16 +128,16 @@ class IPC::Connections
 	def remove (client : IPC::Connection)
 		c = client.connection
 		r = LibIPC.ipc_del(self.pointer, pointerof(c))
-		if r != 0
-			m = String.new LibIPC.ipc_errors_get (r)
+		if r.error_code != 0
+			m = String.new r.error_message.to_slice
 			raise Exception.new "cannot remove a client: #{m}"
 		end
 	end
 
 	def remove_fd (fd : Int)
 		r = LibIPC.ipc_del_fd(self.pointer, fd)
-		if r != 0
-			m = String.new LibIPC.ipc_errors_get (r)
+		if r.error_code != 0
+			m = String.new r.error_message.to_slice
 			raise Exception.new "cannot remove an arbitrary file descriptor: #{m}"
 		end
 	end
@@ -146,8 +151,8 @@ class IPC::Connections
 		end
 
 		r = LibIPC.ipc_wait_event self.pointer, serverp, pointerof(event), pointerof(@timer)
-		if r != 0
-			m = String.new LibIPC.ipc_errors_get (r)
+		if r.error_code != 0
+			m = String.new r.error_message.to_slice
 			yield IPC::Exception.new "error waiting for a new event: #{m}"
 		end
 
@@ -166,7 +171,7 @@ class IPC::Connections
 		return eventtype, IPC::Message.new(message), connection
 	end
 
-	def loop(server : IPC::Connection | IPC::Server | ::Nil, &block : Proc(Events|Exception, Nil))
+	def loop(server : IPC::Connection | IPC::Server | ::Nil, &block : Proc(IPC::Event::Events|Exception, Nil))
 		if @base_timer > 0 && @timer == 0
 			@timer = @base_timer
 		end

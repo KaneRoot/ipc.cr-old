@@ -10,8 +10,8 @@ class IPC::Server < IPC::Connection
 	def initialize(name : String)
 		@connection = LibIPC::Connection.new
 		r = LibIPC.ipc_server_init(LibC.environ, self.pointer, name)
-		if r != 0
-			m = String.new LibIPC.ipc_errors_get (r)
+		if r.error_code != 0
+			m = String.new r.error_message.to_slice
 			raise Exception.new "cannot initialize the server named #{name}: #{m}"
 		end
 
@@ -23,8 +23,8 @@ class IPC::Server < IPC::Connection
 		return if @closed
 
 		r = LibIPC.ipc_server_close(self.pointer)
-		if r != 0
-			m = String.new LibIPC.ipc_errors_get (r)
+		if r.error_code != 0
+			m = String.new r.error_message.to_slice
 			raise Exception.new "cannot close the server correctly: #{m}"
 		end
 
@@ -40,7 +40,7 @@ class IPC::Service < IPC::Connections
 		super()
 	end
 
-	def initialize(name : String, &block : Proc(Events|Exception, Nil))
+	def initialize(name : String, &block : Proc(IPC::Event::Events|Exception, Nil))
 		initialize name
 		loop &block
 		close
@@ -51,7 +51,7 @@ class IPC::Service < IPC::Connections
 		@service_info.fd
 	end
 
-	def loop(&block : Proc(Events|Exception, Nil))
+	def loop(&block : Proc(IPC::Event::Events|Exception, Nil))
 		super(@service_info, &block)
 	end
 
@@ -76,8 +76,8 @@ class IPC::SwitchingService < IPC::Service
 		serverp = server.pointer
 		r = LibIPC.ipc_wait_event_networkd self.pointer, serverp, pointerof(event), @switch.pointer, pointerof(@timer)
 
-		if r != 0
-			m = String.new LibIPC.ipc_errors_get (r)
+		if r.error_code != 0
+			m = String.new r.error_message.to_slice
 			yield IPC::Exception.new "error waiting for a new event: #{m}"
 		end
 

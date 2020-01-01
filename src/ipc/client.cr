@@ -14,7 +14,7 @@ class IPC::Client < IPC::Connections
 		self << @connection
 	end
 
-	def initialize(name : String, &block : Proc(Events|Exception, Nil))
+	def initialize(name : String, &block : Proc(IPC::Event::Events|Exception, Nil))
 		initialize name
 		::loop &block
 		close
@@ -33,7 +33,7 @@ class IPC::Client < IPC::Connections
 		@connection.fd
 	end
 
-	def loop(&block : Proc(Events|Exception, Nil))
+	def loop(&block : Proc(IPC::Event::Events|Exception, Nil))
 		super(nil, &block)
 	end
 

@@ -3,6 +3,8 @@ require "./message"
 require "./connection"
 
 class IPC::Event
+	alias Events = IPC::Event::Timer | IPC::Event::Connection | IPC::Event::Disconnection | IPC::Event::Message | IPC::Event::ExtraSocket | IPC::Event::Switch | IPC::Event::LookUp
+
 	class Timer
 	end
 
@@ -34,6 +36,4 @@ class IPC::Event
 	class LookUp < IPC::Event::Message
 	end
 end
-
-alias Events = IPC::Event::Timer | IPC::Event::Connection | IPC::Event::Disconnection | IPC::Event::Message | IPC::Event::ExtraSocket | IPC::Event::Switch | IPC::Event::LookUp
 
