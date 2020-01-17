@@ -14,10 +14,6 @@ class IPC::Connection
 	def initialize(service_name : String)
 		@connection = LibIPC::Connection.new
 
-		# TODO
-		pp! self.pointer
-		pp! @connection
-
 		r = LibIPC.ipc_connection(LibC.environ, self.pointer, service_name)
 		if r.error_code != 0
 			m = String.new r.error_message.to_slice
@@ -31,6 +27,13 @@ class IPC::Connection
 		yield self
 
 		close
+	end
+
+	# Adds a new connection based on the socket file descriptor
+	def initialize(fd : Int32)
+		external_connection = LibIPC::Connection.new
+		external_connection.fd = fd
+		initialize(external_connection)
 	end
 
 	# sanitizer
