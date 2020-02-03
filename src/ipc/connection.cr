@@ -41,8 +41,11 @@ class IPC::Connection
 		@connection.fd
 	end
 
-	def send(type : UInt8, payload : Bytes)
-		message = LibIPC::Message.new type: LibIPC::MessageType::Data.to_u8, user_type: type, length: payload.bytesize, payload: payload.to_unsafe
+	def send(utype : UInt8, payload : Bytes)
+		message = LibIPC::Message.new type: LibIPC::MessageType::Data.to_u8,
+			user_type: utype,
+			length: payload.bytesize,
+			payload: payload.to_unsafe
 
 		r = LibIPC.ipc_write(self.pointer, pointerof(message))
 		if r.error_code != 0
@@ -51,12 +54,12 @@ class IPC::Connection
 		end
 	end
 
-	def send(type : UInt8, payload : String)
-		send(type, Bytes.new(payload.to_unsafe, payload.bytesize))
+	def send(utype : UInt8, payload : String)
+		send(utype, Bytes.new(payload.to_unsafe, payload.bytesize))
 	end
 
 	def send(message : IPC::Message)
-		send(message.type, message.payload)
+		send(message.utype, message.payload)
 	end
 
 	def read
