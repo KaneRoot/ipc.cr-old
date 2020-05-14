@@ -33,7 +33,7 @@ end
 
 # CAUTION: Only use this method on an Array(IPC::JSON.class)
 class Array(T)
-	def parse_ipc_json(messages : Array(IPC::JSON.class), message : IPC::Message) : IPC::JSON?
+	def parse_ipc_json(message : IPC::Message) : IPC::JSON?
 		message_type = find &.type.==(message.utype)
 
 		payload = String.new message.payload
