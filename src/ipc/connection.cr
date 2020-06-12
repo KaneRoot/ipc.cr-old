@@ -104,8 +104,8 @@ class IPC::StandAloneConnection
 end
 
 class IPC::Connections
-	property base_timer : Int64 = 0
-	property timer : Int64 = 0
+	property base_timer : Float64 = 0.0
+	property timer : Float64 = 0.0
 	getter connections : LibIPC::Connections
 
 	def initialize

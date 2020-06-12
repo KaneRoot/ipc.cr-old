@@ -72,7 +72,7 @@ lib LibIPC
 	fun ipc_read(Connection*, Message*) : IPCError
 	fun ipc_write(Connection*, Message*) : IPCError
 
-	fun ipc_wait_event(Connections*, Connection*, Event*, LibC::Long*) : IPCError
+	fun ipc_wait_event(Connections*, Connection*, Event*, LibC::Double*) : IPCError
 
 	fun ipc_add(Connections*, Connection*) : IPCError
 	fun ipc_del(Connections*, Connection*) : IPCError
@@ -90,7 +90,7 @@ lib LibIPC
 
 
 	# networkd-related functions
-	fun ipc_wait_event_networkd(Connections*, Connection*, Event*, Switchings*, LibC::Long*) : IPCError
+	fun ipc_wait_event_networkd(Connections*, Connection*, Event*, Switchings*, LibC::Double*) : IPCError
 
 	fun ipc_receive_fd (sock : LibC::Int, fd : LibC::Int*) : IPCError
 	fun ipc_provide_fd (sock : LibC::Int, fd : LibC::Int ) : IPCError
