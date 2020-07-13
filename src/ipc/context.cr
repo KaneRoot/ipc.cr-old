@@ -111,7 +111,7 @@ class IPC::Context
 	end
 
 	def send(fd : Int32, message : IPC::Message)
-		send(fd : Int32, message.fd, message.utype, message.payload)
+		send(fd, message.fd, message.utype, message.payload)
 	end
 
 	def read(index : UInt32)
