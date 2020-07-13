@@ -26,8 +26,8 @@ class IPC::JSON
 end
 
 class IPC::Context
-	def send(message : IPC::JSON)
-		send message.type.to_u8, message.to_json
+	def send(fd : Int32, message : IPC::JSON)
+		send fd : Int32, message.type.to_u8, message.to_json
 	end
 end
 

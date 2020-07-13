@@ -110,8 +110,8 @@ class IPC::Context
 		send(fd, utype, Bytes.new(payload.to_unsafe, payload.bytesize))
 	end
 
-	def send(message : IPC::Message)
-		send(message.fd, message.utype, message.payload)
+	def send(fd : Int32, message : IPC::Message)
+		send(fd : Int32, message.fd, message.utype, message.payload)
 	end
 
 	def read(index : UInt32)
