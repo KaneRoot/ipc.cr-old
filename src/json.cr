@@ -25,7 +25,7 @@ class IPC::JSON
 	end
 end
 
-class IPC::Connection
+class IPC::Context
 	def send(message : IPC::JSON)
 		send message.type.to_u8, message.to_json
 	end

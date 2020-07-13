@@ -1,5 +1,5 @@
 name: ipc
-version: 0.6.0
+version: 0.7.0
 
 authors:
   - Philippe Pittoli <karchnu@karchnu.fr>
@@ -9,6 +9,6 @@ description: |
     High-level Crystal bindings to libipc.
 
 libraries:
-  libipc: ">= 0.5"
+  libipc: ">= 0.7"
 
 license: ISC

@@ -1,4 +1,3 @@
-require "./lowlevel"
 
 class IPC::Switch
 	@switch = LibIPC::Switchings.new

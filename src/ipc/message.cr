@@ -1,11 +1,10 @@
-require "./lowlevel"
 require "json"
 
 # JSON is currently used for messages over websockets
 # At some point, this will be replaced by the CBOR format
 
 class IPC::Message
-
+	property fd      : Int32   # file descriptor
 	property mtype   : UInt8   # libipc message type
 	property utype   : UInt8   # libipc user message type
 	property payload : Bytes
@@ -24,7 +23,7 @@ class IPC::Message
 	def self.from_json (str : String)
 		jsonmessage = JSONMessage.from_json str
 
-		IPC::Message.new jsonmessage.mtype, jsonmessage.utype, jsonmessage.payload
+		IPC::Message.new 0, jsonmessage.mtype, jsonmessage.utype, jsonmessage.payload
 	end
 
 	def to_json
@@ -34,10 +33,12 @@ class IPC::Message
 	def initialize(message : Pointer(LibIPC::Message))
 		if message.null?
 			@mtype = LibIPC::MessageType::Error.to_u8
+			@fd = 0
 			@utype = 0
 			@payload = Bytes.new "".to_unsafe, 0
 		else
 			m = message.value
+			@fd = m.fd
 			@mtype = m.type
 			@utype = m.user_type
 			@payload = Bytes.new m.payload, m.length
@@ -48,14 +49,12 @@ class IPC::Message
 		initialize pointerof(message)
 	end
 
-	def initialize(mtype, utype, payload : Bytes)
+	def initialize(@fd, mtype, @utype, @payload : Bytes)
 		@mtype = mtype.to_u8
-		@utype = utype
-		@payload = payload
 	end
 
-	def initialize(mtype, utype, payload : String)
-		initialize(mtype, utype, Bytes.new(payload.to_unsafe, payload.bytesize))
+	def initialize(fd, mtype, utype, payload : String)
+		initialize(fd, mtype, utype, Bytes.new(payload.to_unsafe, payload.bytesize))
 	end
 
 	def self.to_packet (user_type : Int, message : String)
@@ -74,6 +73,10 @@ class IPC::Message
 
 	def to_packet
 		IPC::Message.to_packet @utype, String.new(@payload)
+	end
+
+	def copy_to_message_pointer(pm : LibIPC::Message*)
+		LibIPC.ipc_message_copy pm, @fd, @mtype, @utype, @payload, @payload.size
 	end
 
 	def to_s

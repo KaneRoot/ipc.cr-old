@@ -1,43 +1,15 @@
-require "./lowlevel"
-require "./message"
-require "./event"
-require "./service"
-require "./connection"
 
-
-class IPC::Client < IPC::Connections
-	@connection : IPC::Connection
-
-	def initialize(name : String)
+class IPC::Client < IPC::Context
+	# By default, this is a client.
+	def initialize(service_name : String)
 		super()
-		@connection = IPC::Connection.new name
-		self << @connection
-	end
+		r = LibIPC.ipc_connection(self.pointer, service_name)
+		if r.error_code != 0
+			m = String.new r.error_message.to_slice
+			raise Exception.new "error during connection establishment: #{m}"
+		end
 
-	def initialize(name : String, &block : Proc(IPC::Event::Events|Exception, Nil))
-		initialize name
-		::loop &block
-		close
-	end
-
-	def send(*args)
-		@connection.send *args
-	end
-
-	def read(*args)
-		@connection.read *args
-	end
-
-	# sanitizer
-	def fd
-		@connection.fd
-	end
-
-	def loop(&block : Proc(IPC::Event::Events|Exception, Nil))
-		super(nil, &block)
-	end
-
-	def close
-		@connection.close
+		# Very important as there are filesystem side-effects.
+		at_exit { close }
 	end
 end
