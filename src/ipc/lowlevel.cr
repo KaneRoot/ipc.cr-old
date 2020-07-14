@@ -153,6 +153,7 @@ lib LibIPC
 
 	# non public functions
 	fun ipc_read(ctx : Ctx*, index : LibC::UInt, message : Message*) : IPCError
+	fun ipc_read_fd(fd : Int32, message : Message*) : IPCError
 
 	# for testing purposes
 	fun ipc_switching_print (switch : Switchings*) # Void
