@@ -93,7 +93,7 @@ lib LibIPC
 	# Connection functions.
 	# Context is allocated, ipcd is requested and the connection/initialisation is performed.
 	fun ipc_server_init(ctx : Ctx*, sname : LibC::Char*) : IPCError
-	fun ipc_connection(Ctx*, LibC::Char*) : IPCError
+	fun ipc_connection(Ctx*, LibC::Char*, Int32*) : IPCError
 	fun ipc_connection_switched(Ctx*, LibC::Char*, LibC::Int, Pointer(LibC::Int)) : IPCError
 
 	# ipc_message_copy: pm, @fd, @mtype, @utype, @payload

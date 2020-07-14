@@ -8,6 +8,12 @@ authors:
 description: |
     High-level Crystal bindings to libipc.
 
+targets:
+  pongd:
+    main: tests/pongd.cr
+  pongc:
+    main: tests/pongc.cr
+
 libraries:
   libipc: ">= 0.7"
 
