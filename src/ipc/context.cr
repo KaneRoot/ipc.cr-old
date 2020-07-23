@@ -113,6 +113,10 @@ class IPC::Context
 		send_now message
 	end
 
+	def send_now(fd : Int32, utype : UInt8, payload : String)
+		send_now fd, utype, payload.to_slice
+	end
+
 	def send(message : LibIPC::Message)
 		r = LibIPC.ipc_write(self.pointer, pointerof(message))
 		if r.error_code != 0
@@ -134,7 +138,7 @@ class IPC::Context
 	end
 
 	def send(fd : Int32, utype : UInt8, payload : String)
-		send(fd, utype, Bytes.new(payload.to_unsafe, payload.bytesize))
+		send fd, utype, payload.to_slice
 	end
 
 	def read(index : UInt32)
