@@ -29,6 +29,18 @@ class IPC::Context
 	def send(fd : Int32, message : IPC::JSON)
 		send fd, message.type.to_u8, message.to_json
 	end
+	def send_now(fd : Int32, message : IPC::JSON)
+		send_now fd, message.type.to_u8, message.to_json
+	end
+end
+
+class IPC::Client
+	def send(message : IPC::JSON)
+		send @server_fd.not_nil!, message.type.to_u8, message.to_json
+	end
+	def send_now(message : IPC::JSON)
+		send_now @server_fd.not_nil!, message.type.to_u8, message.to_json
+	end
 end
 
 # CAUTION: Only use this method on an Array(IPC::JSON.class)
