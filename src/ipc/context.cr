@@ -88,7 +88,7 @@ class IPC::Context
 				@timer = @base_timer
 			end
 
-			break if yield wait_event
+			yield wait_event
 		end
 	end
 
