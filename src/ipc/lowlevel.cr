@@ -118,6 +118,10 @@ lib LibIPC
 	# Sending a message (will wait the fd to become available for IO operations).
 	fun ipc_write(Ctx*, Message*) : IPCError
 
+	# Sending a message NOW.
+	# WARNING: unbuffered send do not wait the fd to become available.
+	fun ipc_write_fd(Int32, Message*) : IPCError
+
 	# This function let the user get the default error message based on the error code.
 	# The error message is contained in the IPCError structure, this function should not be used, in most cases.
 	fun ipc_errors_get (LibC::Int) : LibC::Char*

@@ -40,13 +40,13 @@ class IPC::Context
 		end
 	end
 
-	def wait_event(&block) : IPC::Event::Events | Exception
+	def wait_event : IPC::Event::Events | Exception
 		event = LibIPC::Event.new
 
 		r = LibIPC.ipc_wait_event self.pointer, pointerof(event), pointerof(@timer)
 		if r.error_code != 0
 			m = String.new r.error_message.to_slice
-			yield IPC::Exception.new "error waiting for a new event: #{m}"
+			return IPC::Exception.new "error waiting for a new event: #{m}"
 		end
 
 		eventtype = event.type.unsafe_as(LibIPC::EventType)
@@ -88,8 +88,40 @@ class IPC::Context
 				@timer = @base_timer
 			end
 
-			yield wait_event &block
+			break if yield wait_event
 		end
+	end
+
+	def send_now(message : LibIPC::Message)
+		r = LibIPC.ipc_write_fd(message.fd, pointerof(message))
+		if r.error_code != 0
+			m = String.new r.error_message.to_slice
+			raise Exception.new "error writing a message: #{m}"
+		end
+	end
+
+	def send_now(message : IPC::Message)
+		send_now fd: message.fd, utype: message.utype, payload: message.payload
+	end
+
+	def send_now(fd : Int32, utype : UInt8, payload : Bytes)
+		message = LibIPC::Message.new fd: fd,
+			type: LibIPC::MessageType::Data.to_u8,
+			user_type: utype,
+			length: payload.bytesize,
+			payload: payload.to_unsafe
+		send_now message
+	end
+
+	def send(message : LibIPC::Message)
+		r = LibIPC.ipc_write(self.pointer, pointerof(message))
+		if r.error_code != 0
+			m = String.new r.error_message.to_slice
+			raise Exception.new "error writing a message: #{m}"
+		end
+	end
+	def send(message : IPC::Message)
+		send fd: message.fd, utype: message.utype, payload: message.payload
 	end
 
 	def send(fd : Int32, utype : UInt8, payload : Bytes)
@@ -98,20 +130,11 @@ class IPC::Context
 			user_type: utype,
 			length: payload.bytesize,
 			payload: payload.to_unsafe
-
-		r = LibIPC.ipc_write(self.pointer, pointerof(message))
-		if r.error_code != 0
-			m = String.new r.error_message.to_slice
-			raise Exception.new "error writing a message: #{m}"
-		end
+		send message
 	end
 
 	def send(fd : Int32, utype : UInt8, payload : String)
 		send(fd, utype, Bytes.new(payload.to_unsafe, payload.bytesize))
-	end
-
-	def send(message : IPC::Message)
-		send(message.fd, message.utype, message.payload)
 	end
 
 	def read(index : UInt32)
@@ -128,11 +151,6 @@ class IPC::Context
 	# sanitizer
 	def pointer
 		pointerof(@context)
-	end
-
-	# sanitizer
-	def fd
-		@connection.fd
 	end
 
 	def close

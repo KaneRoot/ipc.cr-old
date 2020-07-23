@@ -19,6 +19,10 @@ class IPC::Client < IPC::Context
 		at_exit { close }
 	end
 
+	def fd
+		@server_fd
+	end
+
 	def read
 		unless (fd = @server_fd).nil?
 			message = LibIPC::Message.new
