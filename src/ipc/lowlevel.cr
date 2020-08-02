@@ -11,8 +11,9 @@ lib LibIPC
 	end
 
 	struct Connection
-		type :     ConnectionType  #
-		spath :    LibC::Char*     # [4096] # [PATH_MAX]
+		type :         ConnectionType  #
+		more_to_read : Int16*          #
+		spath :        LibC::Char*     # [4096] # [PATH_MAX]
 	end
 
 	struct Pollfd
@@ -24,9 +25,9 @@ lib LibIPC
 	struct Switching
 		origin : LibC::Int
 		dest :   LibC::Int
-		orig_cb_in  : (Int32, Pointer(Message)) -> ConnectionType
+		orig_cb_in  : (Int32, Pointer(Message), Int16*) -> ConnectionType
 		orig_cb_out : (Int32, Pointer(Message)) -> ConnectionType
-		dest_cb_in  : (Int32, Pointer(Message)) -> ConnectionType
+		dest_cb_in  : (Int32, Pointer(Message), Int16*) -> ConnectionType
 		dest_cb_out : (Int32, Pointer(Message)) -> ConnectionType
 	end
 
@@ -146,7 +147,7 @@ lib LibIPC
 	# , enum ipccb cb_in  (fd, *ipc_message)
 	# , enum ipccb cb_out (fd, *ipc_message)
 	fun ipc_switching_callbacks(Ctx*, LibC::Int,
-		(LibC::Int, LibIPC::Message* -> LibIPC::IPCCB),
+		(LibC::Int, LibIPC::Message*, Int16* -> LibIPC::IPCCB),
 		(LibC::Int, LibIPC::Message* -> LibIPC::IPCCB))
 
 	fun ipc_ctx_switching_add  (ctx : Ctx*, fd1 : LibC::Int, fd2 : LibC::Int)       # Void
