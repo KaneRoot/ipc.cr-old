@@ -11,7 +11,8 @@ class IPC::Server < IPC::Context
 		end
 
 		# Very important as there are filesystem side-effects.
-		at_exit { close }
+		# FIXME: for now, let's forget that.
+		# at_exit { close }
 	end
 end
 

@@ -1,6 +1,7 @@
 
 class IPC::Event
 	alias Events = IPC::Event::Timer |
+		IPC::Event::EventNotSet |
 		IPC::Event::Error |
 		IPC::Event::Connection |
 		IPC::Event::Disconnection |
@@ -50,5 +51,8 @@ class IPC::Event::LookUp < IPC::Event::Base
 end
 
 class IPC::Event::MessageSent < IPC::Event::Base
+end
+
+class IPC::Event::EventNotSet < IPC::Event::Base
 end
 

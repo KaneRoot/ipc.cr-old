@@ -4,6 +4,11 @@ class IPC::Context
 	property timer      : Int32 = LibIPC::INFTIM
 	getter context      : LibIPC::Ctx
 
+	# On message reception, the message is contained into the event structure.
+	# This message is automatically deallocated on the next ipc_wait_event call.
+	# Therefore, we must keep this structure.
+	property event      = LibIPC::Event.new
+
 	def initialize
 		@context = LibIPC::Ctx.new
 	end
@@ -41,45 +46,56 @@ class IPC::Context
 	end
 
 	def wait_event : IPC::Event::Events | Exception
-		event = LibIPC::Event.new
+		r = LibIPC.ipc_wait_event self.pointer, pointerof(@event), pointerof(@timer)
 
-		r = LibIPC.ipc_wait_event self.pointer, pointerof(event), pointerof(@timer)
+		event_type = @event.type.unsafe_as(LibIPC::EventType)
+
 		if r.error_code != 0
 			m = String.new r.error_message.to_slice
+			case event_type
+			when LibIPC::EventType::Disconnection # User disconnected.
+				# In this case, error_code may not be 0, disconnections can happen at any time.
+				return IPC::Event::Disconnection.new @event.origin, @event.index
+			end
+			# Special case where the fd is closed.
+			if r.error_code == 107
+				# Baguette::Log.error "ERROR 107: fd #{@event.origin}"
+				return IPC::Event::Disconnection.new @event.origin, @event.index
+			else
+				# Baguette::Log.error "ERROR #{r.error_code}: fd #{@event.origin}"
+			end
 			return IPC::Exception.new "error waiting for a new event: #{m}"
 		end
 
-		eventtype = event.type.unsafe_as(LibIPC::EventType)
-
-		# if event type is Timer, there is no connection nor message
-		case eventtype
+		# if event type is Timer, there is no file descriptor nor message
+		case event_type
 		when LibIPC::EventType::NotSet
-			return Exception.new "'Event type: not set"
+			return IPC::Event::EventNotSet.new @event.origin, @event.index
 		when LibIPC::EventType::Error
-			return IPC::Event::Error.new event.origin, event.index
+			return IPC::Event::Error.new @event.origin, @event.index
 		when LibIPC::EventType::ExtraSocket   # Message received from a non IPC socket.
-			return IPC::Event::ExtraSocket.new event.origin, event.index
+			return IPC::Event::ExtraSocket.new @event.origin, @event.index
 		when LibIPC::EventType::Switch        # Message to send to a corresponding fd.
-			return IPC::Event::Switch.new event.origin, event.index
+			return IPC::Event::Switch.new @event.origin, @event.index
 		when LibIPC::EventType::Connection    # New user.
-			return IPC::Event::Connection.new event.origin, event.index
+			return IPC::Event::Connection.new @event.origin, @event.index
 		when LibIPC::EventType::Disconnection # User disconnected.
-			return IPC::Event::Disconnection.new event.origin, event.index
+			return IPC::Event::Disconnection.new @event.origin, @event.index
 		when LibIPC::EventType::Message       # New message.
-			lowlevel_message = event.message.unsafe_as(Pointer(LibIPC::Message))
+			lowlevel_message = @event.message.unsafe_as(Pointer(LibIPC::Message))
 			ipc_message = IPC::Message.new lowlevel_message
-			return IPC::Event::MessageReceived.new event.origin, event.index, ipc_message
+			return IPC::Event::MessageReceived.new @event.origin, @event.index, ipc_message
 		when LibIPC::EventType::LookUp        # Client asking for a service through ipcd.
 			# for now, the libipc does not provide lookup events
 			# ipcd uses a simple LibIPC::EventType::Message
-			return IPC::Event::LookUp.new event.origin, event.index
+			return IPC::Event::LookUp.new @event.origin, @event.index
 		when LibIPC::EventType::Timer         # Timeout in the poll(2) function.
 			return IPC::Event::Timer.new
 		when LibIPC::EventType::Tx            # Message sent.
-			return IPC::Event::MessageSent.new event.origin, event.index
+			return IPC::Event::MessageSent.new @event.origin, @event.index
 		end
 
-		return Exception.new "Cannot understand the event type: #{eventtype}"
+		return Exception.new "Cannot understand the event type: #{event_type}"
 	end
 
 	def loop(&block : Proc(IPC::Event::Events|Exception, Nil))
@@ -159,6 +175,7 @@ class IPC::Context
 
 	def close
 		return if @closed
+
 		r = LibIPC.ipc_close_all(self.pointer)
 		if r.error_code != 0
 			m = String.new r.error_message.to_slice

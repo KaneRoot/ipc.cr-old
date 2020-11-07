@@ -151,6 +151,7 @@ lib LibIPC
 		(LibC::Int, LibIPC::Message* -> LibIPC::IPCCB))
 
 	fun ipc_ctx_switching_add  (ctx : Ctx*, fd1 : LibC::Int, fd2 : LibC::Int)       # Void
+	fun ipc_ctx_switching_del  (ctx : Ctx*, fd  : LibC::Int)                        : LibC::Int
 	fun ipc_switching_add  (switch : Switchings*, fd1 : LibC::Int, fd2 : LibC::Int) # Void
 	fun ipc_switching_del  (switch : Switchings*, fd  : LibC::Int                 ) : LibC::Int
 	fun ipc_switching_get  (switch : Switchings*, fd  : LibC::Int                 ) : LibC::Int
