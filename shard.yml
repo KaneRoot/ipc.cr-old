@@ -8,6 +8,11 @@ authors:
 description: |
     High-level Crystal bindings to libipc.
 
+dependencies:
+  cbor:
+    branch: master
+    git: https://git.baguette.netlib.re/Baguette/crystal-cbor
+
 targets:
   pongd:
     main: tests/pongd.cr
