@@ -1,3 +1,4 @@
+require "cbor"
 require "json"
 
 # JSON is currently used for messages over websockets
@@ -9,6 +10,8 @@ class IPC::Message
 	property utype   : UInt8   # libipc user message type
 	property payload : Bytes
 
+
+	# Clients send and receive JSON (or CBOR) payloads.
 	struct JSONMessage
 		include JSON::Serializable
 
@@ -20,15 +23,36 @@ class IPC::Message
 		end
 	end
 
-	def self.from_json (str : String)
+	def self.from_json (str : String) : IPC::Message
 		jsonmessage = JSONMessage.from_json str
-
 		IPC::Message.new 0, jsonmessage.mtype, jsonmessage.utype, jsonmessage.payload
 	end
 
-	def to_json
+	def to_json : String
 		JSONMessage.new(@utype, String.new(@payload), @mtype).to_json
 	end
+
+	struct CBORMessage
+		include CBOR::Serializable
+
+		property mtype : UInt8 = 1  # libipc message type
+		property utype : UInt8      # libipc user message type
+		property payload : Bytes
+
+		def initialize(@utype, @payload, @mtype = 1)
+		end
+	end
+
+	def self.from_cbor (m : Bytes) : IPC::Message
+		cbor_message = CBORMessage.from_cbor m
+		IPC::Message.new 0, cbor_message.mtype, cbor_message.utype, cbor_message.payload
+	end
+
+	def to_cbor : Bytes
+		CBORMessage.new(@utype, @payload, @mtype).to_cbor
+	end
+
+
 
 	def initialize(message : Pointer(LibIPC::Message))
 		if message.null?
