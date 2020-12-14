@@ -1,7 +1,8 @@
 
 class IPC::Context
-	property base_timer : Int32 = LibIPC::INFTIM
-	property timer      : Int32 = LibIPC::INFTIM
+	# TODO: FIXME: base timer default is 30 seconds, INFTIM was causing trouble.
+	property base_timer : Int32 = 30_000 # LibIPC::INFTIM
+	property timer      : Int32 = 30_000 # LibIPC::INFTIM
 	getter context      : LibIPC::Ctx
 
 	# On message reception, the message is contained into the event structure.
