@@ -5,20 +5,20 @@ require "./ipc.cr"
 class IPC::CBOR
 	include ::CBOR::Serializable
 
-	@[::CBOR::Field(ignored: true)]
-	getter       type = -1
+	#@[::CBOR::Field(ignored: true)]
+	#getter       type = -1
 	class_getter type = -1
 
 	property     id   : ::CBOR::Any?
+	def type
+		@@type
+	end
 
 	macro message(id, type, &block)
 		class {{id}} < ::IPC::CBOR
 			include ::CBOR::Serializable
 
 			@@type = {{type}}
-			def type
-				@@type
-			end
 
 			{{yield}}
 		end

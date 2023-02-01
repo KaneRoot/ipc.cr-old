@@ -5,20 +5,20 @@ require "./ipc.cr"
 class IPC::JSON
 	include ::JSON::Serializable
 
-	@[::JSON::Field(ignored: true)]
-	getter       type = -1
-	class_getter type = -1
+	#@[::JSON::Field(ignored: true)]
+	class_property type = -1
 
 	property     id   : ::JSON::Any?
+
+	def type
+		@@type
+	end
 
 	macro message(id, type, &block)
 		class {{id}} < ::IPC::JSON
 			include ::JSON::Serializable
 
 			@@type = {{type}}
-			def type
-				@@type
-			end
 
 			{{yield}}
 		end
